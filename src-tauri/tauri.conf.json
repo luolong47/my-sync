@@ -6,17 +6,17 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "pnpm build:web",
+    "frontendDist": "../dist/app"
   },
   "app": {
     "windows": [
       {
         "title": "My Sync",
-        "width": 1320,
-        "height": 880,
-        "minWidth": 1080,
-        "minHeight": 720
+        "width": 960,
+        "height": 720,
+        "minWidth": 800,
+        "minHeight": 600
       }
     ],
     "security": {

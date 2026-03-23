@@ -1,7 +1,79 @@
-# Tauri + Vue + TypeScript
+# My Sync
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+My Sync 是一款面向个人多设备使用场景的配置文件同步工具。
 
-## Recommended IDE Setup
+它的目标不是整盘备份，也不是整目录镜像，而是把真正需要随身带走的少量配置文件单独管理、单独同步，让不同设备之间的环境保持一致。
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## 适用场景
+
+- 在多台电脑之间同步 Git、Shell、编辑器、包管理器等配置文件
+- 为每个文件单独指定本地位置与远端存放位置
+- 避免整目录同步带来的噪音、冗余和误覆盖
+- 在出现冲突时保留人工决策空间
+
+## 核心能力
+
+- 通过统一的远端空间管理多个配置文件
+- 按文件建立映射关系，而不是按目录整体同步
+- 支持手动同步，也支持后台自动同步
+- 支持本地文件变化后的自动跟进
+- 支持跨设备分别维护本地路径，同时共享同一份远端内容
+
+## 功能说明
+
+### 仪表盘
+
+- 展示系统当前状态
+- 展示最近一次同步结果
+- 展示风险项数量
+- 快速查看最近日志与映射状态
+
+### 远端文件
+
+- 浏览远端目录内容
+- 下载远端文件到本地
+- 上传本地文件到当前远端目录
+- 删除远端文件或目录
+- 重命名远端项目
+
+### 同步日志
+
+- 查看每次同步的执行结果
+- 识别成功、警告与错误
+- 清空日志
+- 导出日志
+
+### 冲突处理
+
+- 展示待处理冲突文件
+- 支持以本地版本为准
+- 支持以远端版本为准
+
+### 设置
+
+- 管理同步账号信息
+- 管理同步策略
+- 管理文件映射
+- 支持拖拽本地文件快速添加映射
+- 文件映射支持独立保存
+
+## 文件映射方式
+
+- 每个同步项对应一个明确的本地文件
+- 每个同步项对应一个明确的远端完整路径
+- 映射项可单独新增、删除和保存
+- 拖入文件后可快速生成新的映射项
+
+## 同步方式
+
+- 可主动发起立即同步
+- 可在后台持续同步
+- 可在本地文件变化后自动处理
+- 可根据预设策略处理冲突
+
+## 使用价值
+
+- 让常用配置随账号在多台设备之间保持一致
+- 减少重复配置环境的成本
+- 降低因手动复制文件导致的遗漏
+- 让同步范围始终可控、清晰、可追踪

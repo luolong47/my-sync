@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-shell-50: #f8f6f1;
+  --color-shell-100: #ebe5d8;
+  --color-shell-900: #17201f;
+  --color-brand-500: #476b63;
+  --color-brand-600: #32534b;
+  --color-accent-500: #d98f3a;
+  --color-accent-600: #b96f22;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-shell-50 text-shell-900 antialiased transition-colors duration-300;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+#app {
+  @apply min-h-screen;
+}
+
+.theme-surface {
+  @apply bg-white/80 text-shell-900 shadow-xl shadow-slate-900/5 backdrop-blur-xl;
+}
+
+.dark .theme-surface {
+  @apply border-white/10 bg-slate-900/75 text-slate-100 shadow-black/20;
+}
+
+.theme-muted {
+  @apply text-slate-600;
+}
+
+.dark .theme-muted {
+  @apply text-slate-300;
+}
