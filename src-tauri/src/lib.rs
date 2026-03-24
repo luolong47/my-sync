@@ -13,7 +13,11 @@ use quick_xml::de::from_str as from_xml_str;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Manager, State};
+use tauri::{
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, State, WindowEvent,
+};
 use tokio::{sync::Mutex, time::sleep};
 use url::Url;
 
@@ -21,6 +25,10 @@ const STORE_FILE_NAME: &str = "state.json";
 const DEFAULT_REMOTE_DIR: &str = "my-sync";
 const MAX_SYNC_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_LOG_ENTRIES: usize = 500;
+const MAIN_WINDOW_LABEL: &str = "main";
+const TRAY_ICON_ID: &str = "main-tray";
+const TRAY_MENU_SHOW_ID: &str = "tray-show";
+const TRAY_MENU_QUIT_ID: &str = "tray-quit";
 const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -1729,12 +1737,63 @@ fn file_watch_loop(app: AppHandle, shared: Arc<Mutex<InMemoryState>>) {
     }
 }
 
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let _ = window.hide();
+    }
+}
+
+fn build_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW_ID, "显示主窗口", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT_ID, "退出应用", true, None::<&str>)?;
+    let tray_menu = Menu::with_items(
+        app,
+        &[&show_item, &PredefinedMenuItem::separator(app)?, &quit_item],
+    )?;
+
+    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .menu(&tray_menu)
+        .tooltip("My Sync")
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            TRAY_MENU_SHOW_ID => show_main_window(app),
+            TRAY_MENU_QUIT_ID => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(&tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        tray_builder = tray_builder.icon(icon);
+    }
+
+    tray_builder.build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            build_tray(&app.handle())?;
             let persisted = load_persisted_state(&app.handle())?;
             app.manage(SharedState(Arc::new(Mutex::new(persisted.into()))));
             let state = app.state::<SharedState>().0.clone();
@@ -1750,6 +1809,12 @@ pub fn run() {
             });
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                hide_main_window(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             load_app_state,
