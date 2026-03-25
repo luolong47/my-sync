@@ -244,6 +244,10 @@ function createMappingFromPath(localPath: string): FileMapping {
   };
 }
 
+async function validateLocalFilePath(localPath: string) {
+  await invoke("validate_local_file", { path: localPath });
+}
+
 function inferRemotePathFromLocal(localPath: string) {
   const normalized = localPath.replace(/\\/g, "/");
   const segments = normalized.split("/").filter(Boolean);
@@ -347,7 +351,7 @@ async function loadAppState() {
   runtime.value = snapshot.runtime;
 }
 
-function addMappingsFromPaths(paths: string[]) {
+async function addMappingsFromPaths(paths: string[]) {
   const normalizedPaths = paths
     .map((item) => item.trim())
     .filter(Boolean)
@@ -358,8 +362,26 @@ function addMappingsFromPaths(paths: string[]) {
     return;
   }
 
-  config.mappings.push(...normalizedPaths.map((item) => createMappingFromPath(item)));
-  notify("positive", `已添加 ${normalizedPaths.length} 个文件映射`);
+  const acceptedPaths: string[] = [];
+  const rejectedMessages: string[] = [];
+
+  for (const path of normalizedPaths) {
+    try {
+      await validateLocalFilePath(path);
+      acceptedPaths.push(path);
+    } catch (error) {
+      rejectedMessages.push(`${path}：${String(error)}`);
+    }
+  }
+
+  if (acceptedPaths.length > 0) {
+    config.mappings.push(...acceptedPaths.map((item) => createMappingFromPath(item)));
+    notify("positive", `已添加 ${acceptedPaths.length} 个文件映射`);
+  }
+
+  if (rejectedMessages.length > 0) {
+    notify("negative", `以下文件未添加：${rejectedMessages.join("；")}`);
+  }
 }
 
 async function loadLogs() {
@@ -448,6 +470,13 @@ async function chooseFile(mapping: FileMapping) {
   });
 
   if (typeof selected !== "string") {
+    return;
+  }
+
+  try {
+    await validateLocalFilePath(selected);
+  } catch (error) {
+    notify("negative", `文件不可添加：${String(error)}`);
     return;
   }
 
@@ -627,7 +656,7 @@ onMounted(async () => {
 
     if (payload.type === "drop") {
       if (acceptsDrop) {
-        addMappingsFromPaths(payload.paths);
+        void addMappingsFromPaths(payload.paths);
       }
       isMappingDropActive.value = false;
     }

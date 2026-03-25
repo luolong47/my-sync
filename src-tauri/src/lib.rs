@@ -801,6 +801,16 @@ async fn export_sync_logs(state: State<'_, SharedState>, path: String) -> Result
 }
 
 #[tauri::command]
+async fn validate_local_file(path: String) -> Result<(), String> {
+    let target = PathBuf::from(path.trim());
+    let metadata = fs::metadata(&target).map_err(|err| err.to_string())?;
+    if !metadata.is_file() {
+        return Err("只能添加普通文件".into());
+    }
+    validate_standalone_file_size(target.to_string_lossy().as_ref(), metadata.len())
+}
+
+#[tauri::command]
 async fn save_app_config(
     app: AppHandle,
     state: State<'_, SharedState>,
@@ -1860,6 +1870,7 @@ pub fn run() {
             rename_remote_file,
             clear_sync_logs,
             export_sync_logs,
+            validate_local_file,
             save_app_config,
             sync_now,
             resolve_conflict
