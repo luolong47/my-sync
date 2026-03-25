@@ -121,20 +121,22 @@ async fn sync_all_mappings(
                 if status_kind == "conflict" {
                     conflict_count += 1;
                 }
-                logs.push(log_entry(LogEntryArgs {
-                    mapping: Some(mapping),
-                    level: if status_kind == "conflict" {
-                        "warning"
-                    } else {
-                        "info"
-                    },
-                    action: &status_kind,
-                    summary: "映射同步完成",
-                    detail: &detail,
-                    http_status: None,
-                    local_path: None,
-                    target_path: None,
-                }));
+                if status_kind != "synced" {
+                    logs.push(log_entry(LogEntryArgs {
+                        mapping: Some(mapping),
+                        level: if status_kind == "conflict" {
+                            "warning"
+                        } else {
+                            "info"
+                        },
+                        action: &status_kind,
+                        summary: "映射同步完成",
+                        detail: &detail,
+                        http_status: None,
+                        local_path: None,
+                        target_path: None,
+                    }));
+                }
                 file_states.insert(mapping.id.clone(), next_state);
             }
             Err(err) => {

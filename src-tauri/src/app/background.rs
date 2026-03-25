@@ -1,19 +1,13 @@
-async fn background_sync_loop(app: AppHandle, shared: Arc<Mutex<InMemoryState>>) {
-    loop {
-        sleep(Duration::from_secs(5)).await;
+async fn sync_once_on_startup(app: AppHandle, shared: Arc<Mutex<InMemoryState>>) {
+    sleep(Duration::from_millis(300)).await;
 
-        let should_sync = {
-            let guard = shared.lock().await;
-            guard.config.webdav.auto_sync
-                && !guard.config.sync.fs_watch_enabled
-                && !guard.config.webdav.base_url.is_empty()
-                && !guard.config.mappings.is_empty()
-                && last_run_due(&guard.last_run_at, guard.config.webdav.sync_interval_secs)
-        };
+    let should_sync = {
+        let guard = shared.lock().await;
+        evaluate_readiness(&guard.config, &guard.file_states).0
+    };
 
-        if should_sync {
-            let _ = perform_sync(app.clone(), shared.clone()).await;
-        }
+    if should_sync {
+        let _ = perform_sync(app, shared).await;
     }
 }
 
@@ -46,7 +40,7 @@ fn file_watch_loop(app: AppHandle, shared: Arc<Mutex<InMemoryState>>) {
             }
         });
 
-        let desired_dirs = if config.webdav.auto_sync && config.sync.fs_watch_enabled {
+        let desired_dirs = if config.sync.fs_watch_enabled {
             watched_directories(&config)
         } else {
             Vec::new()
@@ -185,7 +179,7 @@ pub fn run() {
             let watch_handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
-                background_sync_loop(app_handle, state).await;
+                sync_once_on_startup(app_handle, state).await;
             });
             std::thread::spawn(move || {
                 file_watch_loop(watch_handle, watch_state);

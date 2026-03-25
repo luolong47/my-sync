@@ -71,6 +71,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
   );
 
   let refreshTimer: number | undefined;
+  let refreshLogsTimer: number | undefined;
   let autoSaveTimer: number | undefined;
   let autoSaveEnabled = false;
   let unlistenDragDrop: (() => void) | undefined;
@@ -99,7 +100,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
         remoteDir: config.webdav.remoteDir.trim(),
         clientId: config.webdav.clientId.trim(),
         syncIntervalSecs: Number(config.webdav.syncIntervalSecs) || 30,
-        autoSync: !!config.webdav.autoSync,
+        autoSync: true,
       },
       sync: {
         defaultConflictStrategy: config.sync.defaultConflictStrategy,
@@ -124,7 +125,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     config.webdav.remoteDir = normalized.webdav.remoteDir ?? "my-sync";
     config.webdav.clientId = normalized.webdav.clientId ?? "";
     config.webdav.syncIntervalSecs = normalized.webdav.syncIntervalSecs ?? 30;
-    config.webdav.autoSync = normalized.webdav.autoSync ?? true;
+    config.webdav.autoSync = true;
     config.sync.defaultConflictStrategy = normalized.sync.defaultConflictStrategy ?? "manual";
     config.sync.fsWatchEnabled = normalized.sync.fsWatchEnabled ?? true;
     config.sync.debounceDelaySecs = normalized.sync.debounceDelaySecs ?? 15;
@@ -168,7 +169,21 @@ export const useSyncAppStore = defineStore("sync-app", () => {
   }
 
   async function refreshRuntime() {
-    runtime.value = await invoke<RuntimeSnapshot>("get_runtime_state");
+    const previousLastRunAt = runtime.value.lastRunAt;
+    const nextRuntime = await invoke<RuntimeSnapshot>("get_runtime_state");
+    runtime.value = nextRuntime;
+
+    if (nextRuntime.lastRunAt && nextRuntime.lastRunAt !== previousLastRunAt) {
+      await loadLogs();
+
+      if (refreshLogsTimer) {
+        window.clearTimeout(refreshLogsTimer);
+      }
+
+      refreshLogsTimer = window.setTimeout(() => {
+        void loadLogs();
+      }, 300);
+    }
   }
 
   async function persistConfig() {
@@ -374,6 +389,9 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     }
     if (autoSaveTimer) {
       window.clearTimeout(autoSaveTimer);
+    }
+    if (refreshLogsTimer) {
+      window.clearTimeout(refreshLogsTimer);
     }
     if (unlistenDragDrop) {
       unlistenDragDrop();

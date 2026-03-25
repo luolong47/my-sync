@@ -74,22 +74,6 @@ defineEmits<{
             label="密码 / Token"
             @update:model-value="$emit('configUpdated')"
           />
-          <q-input
-            v-model.number="config.webdav.syncIntervalSecs"
-            outlined
-            type="number"
-            min="10"
-            label="轮询间隔（秒）"
-            @update:model-value="$emit('configUpdated')"
-          />
-          <div class="toggle-box">
-            <q-toggle
-              v-model="config.webdav.autoSync"
-              label="启用后台自动同步"
-              color="primary"
-              @update:model-value="$emit('configUpdated')"
-            />
-          </div>
           <q-banner rounded class="info-banner full-span">
             远端实际同步根路径为：{{ remoteRootPath || "未生成" }}
           </q-banner>
@@ -154,7 +138,7 @@ defineEmits<{
             @update:model-value="$emit('configUpdated')"
           />
           <q-banner rounded class="info-banner">
-            单文件大小限制为 1MB。当前“系统就绪”会检查 WebDAV 基本配置、本地路径是否存在，以及是否有待处理冲突。开启文件监听后，会在检测到变更并静默 {{ config.sync.debounceDelaySecs || 15 }} 秒后批量触发同步。
+            单文件大小限制为 1MB。程序启动时会自动同步一次。开启文件监听后，会在检测到变更并静默 {{ config.sync.debounceDelaySecs || 15 }} 秒后批量触发同步；你也可以通过“立即同步”或新增映射主动触发。
           </q-banner>
         </div>
       </q-card>

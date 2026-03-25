@@ -270,7 +270,7 @@ async fn save_app_config(
         let previous_config = guard.config.clone();
         let queued_paths = collect_new_mapping_paths(&previous_config, &normalized);
         guard.config = normalized;
-        if guard.config.webdav.auto_sync && guard.config.sync.fs_watch_enabled && !queued_paths.is_empty() {
+        if !queued_paths.is_empty() {
             guard.pending_sync_paths.extend(queued_paths);
             guard.pending_sync_started_at = Some(Instant::now());
         }

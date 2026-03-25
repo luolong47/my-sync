@@ -572,6 +572,28 @@ body {
   color: var(--app-text-faint);
 }
 
+:root.dark .q-menu.app-select-menu,
+:root.dark .q-menu.app-select-menu .q-list {
+  background: linear-gradient(180deg, rgba(20, 31, 41, 0.98) 0%, rgba(15, 24, 35, 0.96) 100%);
+  color: var(--app-text);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow);
+}
+
+:root.dark .q-menu.app-select-menu .q-item {
+  color: var(--app-text);
+}
+
+:root.dark .q-menu.app-select-menu .q-item.q-manual-focusable--focused,
+:root.dark .q-menu.app-select-menu .q-item.q-hoverable:hover {
+  background: rgba(103, 179, 159, 0.12);
+}
+
+:root.dark .q-menu.app-select-menu .q-item--active {
+  background: rgba(103, 179, 159, 0.18);
+  color: var(--app-primary-strong);
+}
+
 :root.dark .q-toggle__track {
   opacity: 1;
   background: rgba(237, 243, 241, 0.18);

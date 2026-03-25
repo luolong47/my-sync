@@ -312,15 +312,6 @@ fn append_logs(target: &mut Vec<SyncLogEntry>, mut logs: Vec<SyncLogEntry>) {
     }
 }
 
-fn last_run_due(last_run_at: &Option<String>, interval_secs: u64) -> bool {
-    match last_run_at {
-        Some(value) => DateTime::parse_from_rfc3339(value)
-            .map(|time| Utc::now() - time.with_timezone(&Utc) >= chrono::Duration::seconds(interval_secs as i64))
-            .unwrap_or(true),
-        None => true,
-    }
-}
-
 fn watched_directories(config: &AppConfig) -> Vec<PathBuf> {
     let mut dirs = HashSet::new();
     for mapping in &config.mappings {
