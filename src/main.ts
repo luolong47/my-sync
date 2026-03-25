@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { createPinia } from "pinia";
 import { Quasar, Notify } from "quasar";
 import App from "./App.vue";
 import "@quasar/extras/material-symbols-rounded/material-symbols-rounded.css";
@@ -7,7 +8,7 @@ import "./app.css";
 
 import iconSet from "quasar/icon-set/material-symbols-rounded";
 
-createApp(App).use(Quasar, {
+createApp(App).use(createPinia()).use(Quasar, {
   plugins: {
     Notify,
   },

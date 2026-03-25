@@ -11,24 +11,33 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "build:desktop": "tauri build",
-    "build:portable": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1"
+    "build:portable": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
+    "lint": "pnpm run lint:front && pnpm run lint:back",
+    "lint:front": "eslint src",
+    "lint:back": "cd src-tauri && cargo clippy"
   },
   "dependencies": {
     "@quasar/extras": "^1.17.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2",
+    "pinia": "^3.0.4",
     "quasar": "^2.18.7",
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@quasar/vite-plugin": "^1.11.0",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "eslint": "^10.1.0",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
     "sass": "^1.98.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.6.2",
+    "typescript-eslint": "^8.57.2",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10"
   }
