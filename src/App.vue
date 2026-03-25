@@ -26,6 +26,7 @@ type SyncSettings = {
   defaultConflictStrategy: "manual" | "local" | "remote";
   fsWatchEnabled: boolean;
   debounceDelaySecs: number;
+  launchOnBoot: boolean;
 };
 
 type AppConfig = {
@@ -112,6 +113,7 @@ const config = reactive<AppConfig>({
     defaultConflictStrategy: "manual",
     fsWatchEnabled: true,
     debounceDelaySecs: 15,
+    launchOnBoot: false,
   },
   mappings: [],
 });
@@ -257,6 +259,7 @@ function resetConfig(next: AppConfig) {
   config.sync.defaultConflictStrategy = next.sync?.defaultConflictStrategy ?? "manual";
   config.sync.fsWatchEnabled = next.sync?.fsWatchEnabled ?? true;
   config.sync.debounceDelaySecs = next.sync?.debounceDelaySecs ?? 15;
+  config.sync.launchOnBoot = next.sync?.launchOnBoot ?? false;
   config.mappings.splice(
     0,
     config.mappings.length,
@@ -287,6 +290,7 @@ function snapshotConfig(): AppConfig {
       defaultConflictStrategy: config.sync.defaultConflictStrategy,
       fsWatchEnabled: !!config.sync.fsWatchEnabled,
       debounceDelaySecs: Number(config.sync.debounceDelaySecs) || 15,
+      launchOnBoot: !!config.sync.launchOnBoot,
     },
     mappings: config.mappings.map((item) => ({
       id: item.id,
@@ -1021,6 +1025,15 @@ onBeforeUnmount(() => {
                     { label: '以远端为准', value: 'remote' },
                   ]"
                 />
+                <div class="row items-center justify-between q-gutter-md">
+                  <div class="col">
+                    <div class="text-weight-medium">开机自启动</div>
+                    <div class="text-caption caption-soft">
+                      登录系统后自动启动应用，适合需要长期驻留托盘的场景
+                    </div>
+                  </div>
+                  <q-toggle v-model="config.sync.launchOnBoot" color="primary" />
+                </div>
                 <div class="row items-center justify-between q-gutter-md">
                   <div class="col">
                     <div class="text-weight-medium">启用文件系统监听</div>

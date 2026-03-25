@@ -18,6 +18,8 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, State, WindowEvent,
 };
+#[cfg(desktop)]
+use tauri_plugin_autostart::ManagerExt;
 use tokio::{sync::Mutex, time::sleep};
 use url::Url;
 
@@ -82,6 +84,7 @@ struct SyncSettings {
     default_conflict_strategy: String,
     fs_watch_enabled: bool,
     debounce_delay_secs: u64,
+    launch_on_boot: bool,
 }
 
 impl Default for SyncSettings {
@@ -90,6 +93,7 @@ impl Default for SyncSettings {
             default_conflict_strategy: "manual".into(),
             fs_watch_enabled: true,
             debounce_delay_secs: 15,
+            launch_on_boot: false,
         }
     }
 }
@@ -553,10 +557,15 @@ impl WebDavClient {
 }
 
 #[tauri::command]
-async fn load_app_state(state: State<'_, SharedState>) -> Result<AppSnapshot, String> {
+async fn load_app_state(app: AppHandle, state: State<'_, SharedState>) -> Result<AppSnapshot, String> {
+    let mut config = {
+        let guard = state.0.lock().await;
+        guard.config.clone()
+    };
+    sync_launch_on_boot_from_system(&app, &mut config);
     let guard = state.0.lock().await;
     Ok(AppSnapshot {
-        config: guard.config.clone(),
+        config,
         runtime: runtime_snapshot(&guard),
     })
 }
@@ -803,6 +812,7 @@ async fn save_app_config(
             .ensure_root_collection()
             .await?;
     }
+    apply_launch_on_boot(&app, normalized.sync.launch_on_boot)?;
     let snapshot = {
         let mut guard = state.0.lock().await;
         guard.config = normalized;
@@ -1402,6 +1412,27 @@ fn default_runtime_state() -> FileRuntimeState {
     }
 }
 
+fn sync_launch_on_boot_from_system(app: &AppHandle, config: &mut AppConfig) {
+    #[cfg(desktop)]
+    if let Ok(enabled) = app.autolaunch().is_enabled() {
+        config.sync.launch_on_boot = enabled;
+    }
+}
+
+fn apply_launch_on_boot(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        let manager = app.autolaunch();
+        if enabled {
+            manager.enable().map_err(|err| err.to_string())?;
+        } else {
+            manager.disable().map_err(|err| err.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn store_path(app: &AppHandle) -> Result<PathBuf, String> {
     let mut dir = app.path().app_config_dir().map_err(|err| err.to_string())?;
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
@@ -1790,11 +1821,13 @@ fn build_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             build_tray(&app.handle())?;
-            let persisted = load_persisted_state(&app.handle())?;
+            let mut persisted = load_persisted_state(&app.handle())?;
+            sync_launch_on_boot_from_system(&app.handle(), &mut persisted.config);
             app.manage(SharedState(Arc::new(Mutex::new(persisted.into()))));
             let state = app.state::<SharedState>().0.clone();
             let app_handle = app.handle().clone();
