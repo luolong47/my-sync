@@ -267,7 +267,13 @@ async fn save_app_config(
     apply_launch_on_boot(&app, normalized.sync.launch_on_boot)?;
     let snapshot = {
         let mut guard = state.0.lock().await;
+        let previous_config = guard.config.clone();
+        let queued_paths = collect_new_mapping_paths(&previous_config, &normalized);
         guard.config = normalized;
+        if guard.config.webdav.auto_sync && guard.config.sync.fs_watch_enabled && !queued_paths.is_empty() {
+            guard.pending_sync_paths.extend(queued_paths);
+            guard.pending_sync_started_at = Some(Instant::now());
+        }
         persist_state(&app, &guard)?;
         runtime_snapshot(&guard)
     };
@@ -354,5 +360,22 @@ async fn resolve_conflict(
             Err(err)
         }
     }
+}
+
+fn collect_new_mapping_paths(previous: &AppConfig, current: &AppConfig) -> Vec<String> {
+    let previous_paths = previous
+        .mappings
+        .iter()
+        .map(|item| item.local_path.trim().replace('\\', "/"))
+        .filter(|item| !item.is_empty())
+        .collect::<HashSet<_>>();
+
+    current
+        .mappings
+        .iter()
+        .map(|item| item.local_path.trim().replace('\\', "/"))
+        .filter(|item| !item.is_empty())
+        .filter(|path| !previous_paths.contains(path))
+        .collect()
 }
 

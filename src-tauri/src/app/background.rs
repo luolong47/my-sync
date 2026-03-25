@@ -38,6 +38,14 @@ fn file_watch_loop(app: AppHandle, shared: Arc<Mutex<InMemoryState>>) {
             guard.config.clone()
         });
 
+        tauri::async_runtime::block_on(async {
+            let mut guard = shared.lock().await;
+            if !guard.pending_sync_paths.is_empty() {
+                pending_paths.extend(guard.pending_sync_paths.drain());
+                last_event_at = guard.pending_sync_started_at.take().or(Some(Instant::now()));
+            }
+        });
+
         let desired_dirs = if config.webdav.auto_sync && config.sync.fs_watch_enabled {
             watched_directories(&config)
         } else {

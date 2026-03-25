@@ -166,6 +166,8 @@ struct InMemoryState {
     is_syncing: bool,
     last_run_at: Option<String>,
     last_summary: String,
+    pending_sync_paths: HashSet<String>,
+    pending_sync_started_at: Option<Instant>,
 }
 
 impl From<PersistedStore> for InMemoryState {
@@ -177,6 +179,8 @@ impl From<PersistedStore> for InMemoryState {
             is_syncing: false,
             last_run_at: None,
             last_summary: "尚未同步".into(),
+            pending_sync_paths: HashSet::new(),
+            pending_sync_started_at: None,
         }
     }
 }
