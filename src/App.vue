@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -86,8 +86,7 @@ type AppSnapshot = {
 const $q = useQuasar();
 const currentTab = ref("dashboard");
 const leftDrawerOpen = ref(false);
-const isSavingSettings = ref(false);
-const isSavingMappings = ref(false);
+const isAutoSaving = ref(false);
 const isBooting = ref(true);
 const isDarkMode = ref(false);
 const logs = ref<SyncLogEntry[]>([]);
@@ -98,6 +97,8 @@ const isMappingDropActive = ref(false);
 const lastSavedConfig = ref<AppConfig | null>(null);
 let refreshTimer: number | undefined;
 let unlistenDragDrop: (() => void) | undefined;
+let autoSaveTimer: number | undefined;
+let autoSaveEnabled = false;
 
 const config = reactive<AppConfig>({
   webdav: {
@@ -147,6 +148,13 @@ const canSync = computed(
     !!config.webdav.baseUrl.trim() &&
     !!config.webdav.username.trim() &&
     config.mappings.length > 0,
+);
+const canBrowseRemote = computed(
+  () =>
+    !!config.webdav.baseUrl.trim() &&
+    !!config.webdav.username.trim() &&
+    !!config.webdav.remoteDir.trim() &&
+    !!config.webdav.clientId.trim(),
 );
 const navItems = [
   { key: "dashboard", label: "首页", icon: "sym_r_dashboard" },
@@ -359,6 +367,12 @@ async function loadLogs() {
 }
 
 async function loadRemoteFiles(path = "") {
+  if (!canBrowseRemote.value) {
+    remoteEntries.value = [];
+    remotePath.value = "";
+    return;
+  }
+
   isLoadingRemote.value = true;
   try {
     remoteEntries.value = await invoke<RemoteBrowserEntry[]>("list_remote_files", {
@@ -377,64 +391,42 @@ async function refreshRuntime() {
 }
 
 function savedBaseConfig(): AppConfig {
-  return (
-    lastSavedConfig.value ?? {
-      webdav: { ...snapshotConfig().webdav },
-      sync: { ...snapshotConfig().sync },
-      mappings: [],
+  return lastSavedConfig.value ?? snapshotConfig();
+}
+
+async function persistConfig() {
+  const nextConfig = snapshotConfig();
+  const currentSaved = savedBaseConfig();
+  if (JSON.stringify(nextConfig) === JSON.stringify(currentSaved)) {
+    return;
+  }
+
+  isAutoSaving.value = true;
+  try {
+    runtime.value = await invoke<RuntimeSnapshot>("save_app_config", {
+      config: nextConfig,
+    });
+    lastSavedConfig.value = cloneConfig(nextConfig);
+    if (canBrowseRemote.value) {
+      await loadRemoteFiles(remotePath.value);
     }
-  );
-}
-
-async function saveSettings() {
-  isSavingSettings.value = true;
-  try {
-    const persisted = savedBaseConfig();
-    runtime.value = await invoke<RuntimeSnapshot>("save_app_config", {
-      config: {
-        webdav: { ...snapshotConfig().webdav },
-        sync: { ...snapshotConfig().sync },
-        mappings: persisted.mappings.map((item) => ({ ...item })),
-      },
-    });
-    lastSavedConfig.value = {
-      webdav: { ...snapshotConfig().webdav },
-      sync: { ...snapshotConfig().sync },
-      mappings: persisted.mappings.map((item) => ({ ...item })),
-    };
-    await loadRemoteFiles(remotePath.value);
-    notify("positive", "设置已保存");
   } catch (error) {
-    notify("negative", `保存失败：${String(error)}`);
+    notify("negative", `自动保存失败：${String(error)}`);
   } finally {
-    isSavingSettings.value = false;
+    isAutoSaving.value = false;
   }
 }
 
-async function saveMappings() {
-  isSavingMappings.value = true;
-  try {
-    const current = snapshotConfig();
-    const persisted = savedBaseConfig();
-    runtime.value = await invoke<RuntimeSnapshot>("save_app_config", {
-      config: {
-        webdav: { ...persisted.webdav },
-        sync: { ...persisted.sync },
-        mappings: current.mappings.map((item) => ({ ...item })),
-      },
-    });
-    lastSavedConfig.value = {
-      webdav: { ...persisted.webdav },
-      sync: { ...persisted.sync },
-      mappings: current.mappings.map((item) => ({ ...item })),
-    };
-    await loadRemoteFiles(remotePath.value);
-    notify("positive", "文件映射已保存");
-  } catch (error) {
-    notify("negative", `保存映射失败：${String(error)}`);
-  } finally {
-    isSavingMappings.value = false;
+function schedulePersistConfig() {
+  if (!autoSaveEnabled) {
+    return;
   }
+  if (autoSaveTimer) {
+    window.clearTimeout(autoSaveTimer);
+  }
+  autoSaveTimer = window.setTimeout(() => {
+    void persistConfig();
+  }, 500);
 }
 
 async function syncNow() {
@@ -643,6 +635,7 @@ onMounted(async () => {
   try {
     await Promise.all([loadAppState(), loadLogs()]);
     await loadRemoteFiles();
+    autoSaveEnabled = true;
   } catch (error) {
     notify("negative", `初始化失败：${String(error)}`);
   } finally {
@@ -658,10 +651,21 @@ onBeforeUnmount(() => {
   if (refreshTimer) {
     window.clearInterval(refreshTimer);
   }
+  if (autoSaveTimer) {
+    window.clearTimeout(autoSaveTimer);
+  }
   if (unlistenDragDrop) {
     unlistenDragDrop();
   }
 });
+
+watch(
+  snapshotConfig,
+  () => {
+    schedulePersistConfig();
+  },
+  { deep: true },
+);
 </script>
 
 <template>
@@ -988,7 +992,9 @@ onBeforeUnmount(() => {
               <div class="eyebrow">Settings</div>
               <h1>设置</h1>
             </div>
-            <q-btn color="primary" unelevated label="保存设置" :loading="isSavingSettings" @click="saveSettings" />
+            <q-chip dense class="status-pill" :class="`status-pill--${isAutoSaving ? 'primary' : 'neutral'}`">
+              {{ isAutoSaving ? "自动保存中" : "已自动保存" }}
+            </q-chip>
           </div>
 
           <div class="settings-grid">
@@ -1069,7 +1075,6 @@ onBeforeUnmount(() => {
                 <div class="panel-subtitle">支持拖拽本地文件到此区域快速添加映射</div>
               </div>
               <div class="row q-gutter-sm mapping-toolbar">
-                <q-btn flat class="subtle-action" label="保存映射" :loading="isSavingMappings" @click="saveMappings" />
                 <q-btn color="primary" unelevated icon="sym_r_add" label="新增映射" @click="addMapping" />
               </div>
             </div>
