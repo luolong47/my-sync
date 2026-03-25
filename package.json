@@ -1,17 +1,19 @@
 {
   "name": "my-sync",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
-    "build:web": "vue-tsc --noEmit && vite build",
+    "build:web": "node scripts/version-bump.mjs patch && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "build:desktop": "tauri build",
     "build:portable": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
+    "version:patch": "node scripts/version-bump.mjs patch",
+    "version:minor": "node scripts/version-bump.mjs minor",
     "lint": "pnpm run lint:front && pnpm run lint:back",
     "lint:front": "eslint src",
     "lint:back": "cd src-tauri && cargo clippy"
