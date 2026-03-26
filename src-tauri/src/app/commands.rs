@@ -229,6 +229,52 @@ async fn rename_remote_file(
 }
 
 #[tauri::command]
+async fn create_remote_directory(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+    remote_dir_path: Option<String>,
+    name: String,
+) -> Result<(), String> {
+    let config = {
+        let guard = state.0.lock().await;
+        guard.config.clone()
+    };
+    if !can_prepare_remote_root(&config) {
+        return Err("请先完成 WebDAV 设置".into());
+    }
+
+    let name = name.trim().trim_matches('/');
+    if name.is_empty() {
+        return Err("目录名称不能为空".into());
+    }
+
+    let target_path = match remote_dir_path.as_deref() {
+        Some(path) if !path.trim().is_empty() => format!("{}/{}", path.trim_matches('/'), name),
+        _ => name.to_string(),
+    };
+
+    let client = WebDavClient::new(config.webdav)?;
+    client.create_remote_directory(&target_path).await?;
+
+    let mut guard = state.0.lock().await;
+    append_logs(
+        &mut guard.sync_logs,
+        vec![log_entry(LogEntryArgs {
+            mapping: None,
+            level: "info",
+            action: "create-remote-dir",
+            summary: "远端目录已创建",
+            detail: &target_path,
+            http_status: None,
+            local_path: None,
+            target_path: Some(target_path.clone()),
+        })],
+    );
+    persist_state(&app, &guard)?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn clear_sync_logs(app: AppHandle, state: State<'_, SharedState>) -> Result<(), String> {
     let mut guard = state.0.lock().await;
     guard.sync_logs.clear();

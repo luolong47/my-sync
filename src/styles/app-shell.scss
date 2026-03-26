@@ -427,6 +427,26 @@ body {
   min-height: 48px;
 }
 
+.logs-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(170px, 220px) minmax(260px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.logs-filter-cell {
+  min-width: 0;
+}
+
+.logs-toolbar-field.q-field--dense .q-field__control,
+.logs-toolbar-field .q-field__control {
+  min-height: 40px;
+}
+
+.logs-filter-cell--search {
+  min-width: 220px;
+}
+
 .mapping-meta,
 .conflict-meta,
 .remote-root-box {
@@ -442,6 +462,160 @@ body {
   align-items: flex-end;
   color: var(--app-text-soft);
   font-size: 12px;
+}
+
+.drive-list-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.drive-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 22px 14px;
+}
+
+.drive-list-heading {
+  min-width: 0;
+}
+
+.drive-list-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drive-breadcrumbs {
+  margin-top: 8px;
+  color: var(--app-text-soft);
+}
+
+.drive-breadcrumb {
+  cursor: pointer;
+}
+
+.drive-table-head,
+.drive-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) 170px 110px 60px;
+  gap: 16px;
+  align-items: center;
+}
+
+.drive-table-head {
+  padding: 0 22px;
+  min-height: 52px;
+  color: var(--app-text-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.file-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.drive-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.drive-row {
+  min-height: 62px;
+  padding: 0 22px;
+  border-top: 1px solid var(--app-border);
+  transition: background 0.16s ease;
+}
+
+.drive-row--clickable {
+  cursor: pointer;
+}
+
+.drive-row:hover {
+  background: var(--app-primary-soft);
+}
+
+.drive-row__name {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.drive-row__icon {
+  flex: 0 0 auto;
+  font-size: 24px;
+}
+
+.drive-row__text {
+  min-width: 0;
+}
+
+.drive-row__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.drive-row__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-row__meta {
+  margin-top: 4px;
+  color: var(--app-text-soft);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-row__date,
+.drive-row__size {
+  color: var(--app-text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.drive-row__actions {
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.drive-row__actions .q-btn {
+  background: transparent;
+}
+
+.drive-row:hover .drive-row__actions,
+.drive-row:focus-within .drive-row__actions {
+  opacity: 1;
+}
+
+.drive-inline-chip {
+  font-size: 11px;
+  min-height: 22px;
 }
 
 .about-card {
@@ -683,8 +857,30 @@ body {
     align-items: stretch;
   }
 
+  .drive-list-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .drive-list-controls {
+    justify-content: space-between;
+  }
+
+  .drive-table-head,
+  .drive-row {
+    grid-template-columns: minmax(0, 1.6fr) 140px 90px 52px;
+  }
+
   .dashboard-sync-btn {
     width: 100%;
+  }
+
+  .logs-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-filter-cell--search {
+    grid-column: 1 / -1;
   }
 }
 
@@ -695,5 +891,40 @@ body {
   .form-grid,
   .mapping-grid {
     grid-template-columns: 1fr;
+  }
+
+  .logs-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-filter-cell--search {
+    grid-column: auto;
+  }
+
+  .drive-list-controls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .drive-table-head {
+    display: none;
+  }
+
+  .drive-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    min-height: 0;
+    padding: 14px 18px;
+  }
+
+  .drive-row__actions {
+    justify-content: flex-start;
+    opacity: 1;
+  }
+
+  .drive-row__meta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
 }

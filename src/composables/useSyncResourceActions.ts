@@ -159,8 +159,27 @@ export function useSyncResourceActions(context: ResourceActionContext) {
     }
   }
 
+  async function createRemoteDirectory() {
+    try {
+      const name = window.prompt("输入新目录名称")?.trim();
+      if (!name) {
+        return;
+      }
+
+      await invoke("create_remote_directory", {
+        remoteDirPath: context.remotePath.value || null,
+        name,
+      });
+      await context.loadRemoteFiles(context.remotePath.value);
+      notify("positive", "远端目录已创建");
+    } catch (error) {
+      notify("negative", `创建远端目录失败：${String(error)}`);
+    }
+  }
+
   return {
     clearLogs,
+    createRemoteDirectory,
     deleteRemoteEntry,
     downloadRemoteFile,
     exportLogs,

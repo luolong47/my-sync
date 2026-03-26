@@ -70,6 +70,12 @@ impl WebDavClient {
             .await
     }
 
+    async fn create_remote_directory(&self, remote_dir_path: &str) -> Result<(), String> {
+        let mut all_segments = self.remote_root_segments();
+        all_segments.extend(normalize_segments(remote_dir_path));
+        self.ensure_collection_chain(&all_segments).await
+    }
+
     async fn ensure_parent_collections(&self, remote_path: &str) -> Result<(), String> {
         let mut all_segments = self.remote_root_segments();
         let file_segments = normalize_segments(remote_path);
@@ -104,12 +110,7 @@ impl WebDavClient {
         let response = response.error_for_status().map_err(|err| err.to_string())?;
         let xml = response.text().await.map_err(|err| err.to_string())?;
         let parsed: MultiStatus = from_xml_str(&xml).map_err(|err| err.to_string())?;
-        let current_segments = join_remote_segments_with_client(
-            &self.settings.remote_dir,
-            &self.settings.client_id,
-            remote_path,
-        );
-        let current_path = format!("/{}", current_segments.join("/"));
+        let current_path = url.path().trim_end_matches('/').to_string();
 
         let mut entries = Vec::new();
         for item in parsed.responses {
@@ -119,11 +120,12 @@ impl WebDavClient {
             }
 
             let relative = relative_remote_path(&href_path, &current_path);
-            if relative.is_empty() || relative.contains('/') && !href_path.ends_with('/') {
-                // keep immediate children only
-                if relative.contains('/') {
-                    continue;
-                }
+            if relative.is_empty() {
+                continue;
+            }
+
+            if relative.trim_end_matches('/').contains('/') {
+                continue;
             }
 
             let prop = item.propstats.into_iter().next().map(|value| value.prop);

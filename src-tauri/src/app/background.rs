@@ -202,6 +202,7 @@ pub fn run() {
             upload_local_file,
             delete_remote_file,
             rename_remote_file,
+            create_remote_directory,
             clear_sync_logs,
             export_sync_logs,
             validate_local_file,

@@ -68,9 +68,12 @@ const currentViewProps = computed(() => {
       return {
         config: config.value,
         isLoadingRemote: isLoadingRemote.value,
+        mappings: config.value.mappings,
         remoteEntries: remoteEntries.value,
         remotePath: remotePath.value,
         remotePathLabel: remotePathLabel.value,
+        runtimeStatus: store.runtimeStatus,
+        statusTone: store.statusTone,
       };
     case "logs":
       return {
@@ -144,10 +147,13 @@ onBeforeUnmount(() => {
           @choose-file="store.chooseFile"
           @clear-logs="store.clearLogs"
           @config-updated="store.handleConfigUpdated"
+          @create-directory="store.createRemoteDirectory"
           @delete-entry="store.deleteRemoteEntry"
           @download-file="store.downloadRemoteFile"
           @export-logs="store.exportLogs"
+          @map-entry="store.mapRemoteEntryToLocal"
           @navigate="handleSelectTab"
+          @rename-mapping="store.renameMapping"
           @remove-mapping="store.removeMapping"
           @rename-entry="store.renameRemoteEntry"
           @resolve="store.resolveConflict"

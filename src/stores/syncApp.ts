@@ -304,6 +304,60 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     schedulePersistConfig();
   }
 
+  async function mapRemoteEntryToLocal(entry: RemoteBrowserEntry) {
+    if (entry.isDir) {
+      notify("warning", "目录不能直接创建文件映射");
+      return;
+    }
+
+    if (config.mappings.some((item) => item.remotePath === entry.path)) {
+      notify("warning", "该远端文件已存在映射");
+      return;
+    }
+
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      title: `选择要绑定到 ${entry.name} 的本地文件`,
+    });
+
+    if (typeof selected !== "string") {
+      return;
+    }
+
+    try {
+      await validateLocalFilePath(selected);
+    } catch (error) {
+      notify("negative", `文件不可添加：${String(error)}`);
+      return;
+    }
+
+    if (config.mappings.some((item) => item.localPath === selected)) {
+      notify("warning", "该本地文件已存在映射");
+      return;
+    }
+
+    config.mappings.push({
+      id: crypto.randomUUID(),
+      name: entry.name,
+      localPath: selected,
+      remotePath: entry.path,
+    });
+    schedulePersistConfig();
+    notify("positive", "已从远端文件创建映射");
+  }
+
+  function renameMapping(mapping: FileMapping) {
+    const nextName = window.prompt("输入新的映射名称", mapping.name || mapping.remotePath)?.trim();
+    if (!nextName || nextName === mapping.name) {
+      return;
+    }
+
+    mapping.name = nextName;
+    schedulePersistConfig();
+    notify("positive", "映射名称已更新");
+  }
+
   async function syncNow() {
     try {
       runtime.value = await invoke<RuntimeSnapshot>("sync_now");
@@ -427,6 +481,8 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     chooseFile,
     formatDateTime,
     loadRemoteFiles,
+    mapRemoteEntryToLocal,
+    renameMapping,
     removeMapping,
     selectTab,
     statusTone,
