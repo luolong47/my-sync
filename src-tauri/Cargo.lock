@@ -2002,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "my-sync"
-version = "0.1.6"
+version = "0.1.11"
 dependencies = [
  "chrono",
  "httpdate",

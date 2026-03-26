@@ -105,41 +105,44 @@ const filteredLogs = computed(() => {
     </div>
 
     <q-card flat class="panel-card theme-surface">
-      <div class="row q-col-gutter-md q-mb-md">
-        <div class="col-12 col-md-4">
+      <div class="logs-filter-bar q-mb-md">
+        <div class="logs-filter-cell logs-filter-cell--narrow">
           <q-select
             v-model="levelFilter"
             outlined
+            dense
             emit-value
             map-options
-            label="日志级别"
-            class="compact-field"
+            prefix="级别"
+            class="compact-field logs-toolbar-field"
             :options="levelOptions"
             options-dark
             popup-content-class="app-select-menu"
           />
         </div>
-        <div class="col-12 col-md-4">
+        <div class="logs-filter-cell logs-filter-cell--narrow">
           <q-select
             v-model="actionFilter"
             outlined
+            dense
             emit-value
             map-options
-            label="日志动作"
-            class="compact-field"
+            prefix="动作"
+            class="compact-field logs-toolbar-field"
             :options="actionOptions"
             options-dark
             popup-content-class="app-select-menu"
           />
         </div>
-        <div class="col-12 col-md-4">
+        <div class="logs-filter-cell logs-filter-cell--search">
           <q-input
             v-model="keyword"
             outlined
+            dense
             clearable
-            label="搜索内容"
-            placeholder="映射名、路径、说明"
-            class="compact-field"
+            prefix="搜索"
+            placeholder="搜索映射名、路径、说明"
+            class="compact-field logs-toolbar-field"
           />
         </div>
       </div>
