@@ -4,8 +4,32 @@ async fn load_app_state(app: AppHandle, state: State<'_, SharedState>) -> Result
         let guard = state.0.lock().await;
         guard.config.clone()
     };
+    let sync_error = match sync_remote_config_and_bindings(config.clone()).await {
+        Ok(next) => {
+            config = next;
+            None
+        }
+        Err(err) => Some(err),
+    };
     sync_launch_on_boot_from_system(&app, &mut config);
-    let guard = state.0.lock().await;
+    let mut guard = state.0.lock().await;
+    guard.config = config.clone();
+    if let Some(err) = sync_error {
+        append_logs(
+            &mut guard.sync_logs,
+            vec![log_entry(LogEntryArgs {
+                mapping: None,
+                level: "warning",
+                action: "load-remote-config",
+                summary: "远端配置读取失败，已回退到本地缓存",
+                detail: &err,
+                http_status: None,
+                local_path: None,
+                target_path: None,
+            })],
+        );
+    }
+    persist_state(&app, &guard)?;
     Ok(AppSnapshot {
         config,
         runtime: runtime_snapshot(&guard),
@@ -306,8 +330,13 @@ async fn save_app_config(
 ) -> Result<RuntimeSnapshot, String> {
     let normalized = normalize_config(config);
     if can_prepare_remote_root(&normalized) {
-        WebDavClient::new(normalized.webdav.clone())?
-            .ensure_root_collection()
+        let client = WebDavClient::new(normalized.webdav.clone())?;
+        client.ensure_root_collection().await?;
+        client
+            .save_shared_sync_items(&build_shared_sync_items(&normalized))
+            .await?;
+        client
+            .save_device_bindings(&build_device_bindings(&normalized))
             .await?;
     }
     apply_launch_on_boot(&app, normalized.sync.launch_on_boot)?;
@@ -423,5 +452,28 @@ fn collect_new_mapping_paths(previous: &AppConfig, current: &AppConfig) -> Vec<S
         .filter(|item| !item.is_empty())
         .filter(|path| !previous_paths.contains(path))
         .collect()
+}
+
+async fn sync_remote_config_and_bindings(config: AppConfig) -> Result<AppConfig, String> {
+    if !can_prepare_remote_root(&config) {
+        return Ok(config);
+    }
+
+    let client = WebDavClient::new(config.webdav.clone())?;
+    client.ensure_root_collection().await?;
+    let remote_items = client.fetch_shared_sync_items().await?;
+    let remote_bindings = client.fetch_device_bindings().await?;
+    let (merged_config, merged_items, merged_bindings) = sync_remote_state(
+        &config,
+        remote_items.clone(),
+        remote_bindings.clone(),
+    );
+    if remote_items.as_ref() != Some(&merged_items) {
+        client.save_shared_sync_items(&merged_items).await?;
+    }
+    if remote_bindings.as_ref() != Some(&merged_bindings) {
+        client.save_device_bindings(&merged_bindings).await?;
+    }
+    Ok(merged_config)
 }
 

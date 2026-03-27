@@ -194,6 +194,13 @@ async fn sync_single_mapping(
     client: &WebDavClient,
     strategy: ConflictStrategy,
 ) -> Result<(FileRuntimeState, String, String), String> {
+    if mapping.binding_status != "bound" || mapping.local_path.trim().is_empty() {
+        state.status = "pending_bind".into();
+        state.detail = "当前设备尚未确认本地路径绑定".into();
+        state.last_sync_at = None;
+        return Ok((state, "pending_bind".into(), "当前设备尚未确认本地路径绑定".into()));
+    }
+
     let local_path = PathBuf::from(mapping.local_path.trim());
     let local = read_local_file(&local_path)?;
     validate_local_file_size(mapping, &local)?;

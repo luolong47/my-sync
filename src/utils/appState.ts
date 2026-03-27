@@ -14,7 +14,9 @@ export function createDefaultConfig(): AppConfig {
       username: "",
       password: "",
       remoteDir: "my-sync",
-      clientId: "",
+      spaceId: "default",
+      deviceId: "",
+      deviceName: "",
       syncIntervalSecs: 30,
       autoSync: true,
     },
@@ -116,6 +118,8 @@ export function createMapping(): FileMapping {
     name: "",
     localPath: "",
     remotePath: "",
+    pathTemplate: "",
+    bindingStatus: "pending_bind",
   };
 }
 
@@ -127,7 +131,24 @@ export function createMappingFromPath(localPath: string): FileMapping {
     name: filename,
     localPath,
     remotePath: inferRemotePathFromLocal(localPath),
+    pathTemplate: inferPathTemplateFromLocal(localPath),
+    bindingStatus: "bound",
   };
+}
+
+export function inferPathTemplateFromLocal(localPath: string) {
+  const normalized = localPath.replace(/\\/g, "/");
+  const windowsMatch = normalized.match(/^([A-Za-z]:\/Users\/[^/]+)(\/.*)?$/);
+  if (windowsMatch) {
+    return `%USERPROFILE%${windowsMatch[2] ?? ""}`;
+  }
+
+  const homeMatch = normalized.match(/^(\/Users\/[^/]+|\/home\/[^/]+)(\/.*)?$/);
+  if (homeMatch) {
+    return `$HOME${homeMatch[2] ?? ""}`;
+  }
+
+  return normalized;
 }
 
 export function fullRemotePath(rootPath: string, path: string) {
@@ -148,6 +169,8 @@ export function statusTone(status: string) {
       return "primary";
     case "pulled":
       return "neutral";
+    case "pending_bind":
+      return "warning";
     case "conflict":
       return "warning";
     case "error":

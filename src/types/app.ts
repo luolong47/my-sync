@@ -7,6 +7,8 @@ export type FileMapping = {
   name: string;
   localPath: string;
   remotePath: string;
+  pathTemplate: string;
+  bindingStatus: string;
 };
 
 export type WebDavSettings = {
@@ -14,7 +16,9 @@ export type WebDavSettings = {
   username: string;
   password: string;
   remoteDir: string;
-  clientId: string;
+  spaceId: string;
+  deviceId: string;
+  deviceName: string;
   syncIntervalSecs: number;
   autoSync: boolean;
 };

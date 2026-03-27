@@ -36,7 +36,7 @@ const mappedByRemotePath = computed(
 );
 
 const breadcrumbItems = computed(() => {
-  const rootLabel = [props.config.webdav.remoteDir, props.config.webdav.clientId]
+  const rootLabel = [props.config.webdav.remoteDir, props.config.webdav.spaceId]
     .filter(Boolean)
     .join("/");
   const segments = props.remotePath.split("/").filter(Boolean);
@@ -128,7 +128,7 @@ function entryMapping(entry: RemoteBrowserEntry) {
 }
 
 function handleRemoveMapping(mapping: FileMapping) {
-  if (!window.confirm(`确认解除映射“${mapping.name || mapping.remotePath}”？`)) {
+  if (!window.confirm(`确认删除共享同步项“${mapping.name || mapping.remotePath}”？`)) {
     return;
   }
 
@@ -342,7 +342,7 @@ function handleRemoveMapping(mapping: FileMapping) {
                       <q-icon name="sym_r_link_off" color="negative" />
                     </q-item-section>
                     <q-item-section>
-                      解绑映射
+                      删除同步项
                     </q-item-section>
                   </q-item>
                   <q-item

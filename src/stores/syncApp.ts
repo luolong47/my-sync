@@ -23,6 +23,7 @@ import {
   createMappingFromPath,
   formatDateTime,
   fullRemotePath as resolveFullRemotePath,
+  inferPathTemplateFromLocal,
   inferRemotePathFromLocal,
   notify,
   statusTone,
@@ -51,7 +52,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
   );
   const recentLogs = computed(() => logs.value.slice(0, 6));
   const remoteRootPath = computed(() =>
-    [config.webdav.remoteDir.trim(), config.webdav.clientId.trim()].filter(Boolean).join("/"),
+    [config.webdav.remoteDir.trim(), config.webdav.spaceId.trim()].filter(Boolean).join("/"),
   );
   const remotePathLabel = computed(() =>
     remotePath.value ? `${remoteRootPath.value}/${remotePath.value}` : remoteRootPath.value,
@@ -67,7 +68,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
       !!config.webdav.baseUrl.trim() &&
       !!config.webdav.username.trim() &&
       !!config.webdav.remoteDir.trim() &&
-      !!config.webdav.clientId.trim(),
+      !!config.webdav.spaceId.trim(),
   );
 
   let refreshTimer: number | undefined;
@@ -98,7 +99,9 @@ export const useSyncAppStore = defineStore("sync-app", () => {
         username: config.webdav.username.trim(),
         password: config.webdav.password,
         remoteDir: config.webdav.remoteDir.trim(),
-        clientId: config.webdav.clientId.trim(),
+        spaceId: config.webdav.spaceId.trim(),
+        deviceId: config.webdav.deviceId.trim(),
+        deviceName: config.webdav.deviceName.trim(),
         syncIntervalSecs: Number(config.webdav.syncIntervalSecs) || 30,
         autoSync: true,
       },
@@ -113,6 +116,8 @@ export const useSyncAppStore = defineStore("sync-app", () => {
         name: item.name.trim(),
         localPath: item.localPath.trim(),
         remotePath: item.remotePath.trim().replace(/\\/g, "/"),
+        pathTemplate: item.pathTemplate.trim().replace(/\\/g, "/"),
+        bindingStatus: item.bindingStatus || (item.localPath.trim() ? "bound" : "pending_bind"),
       })),
     };
   }
@@ -123,14 +128,23 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     config.webdav.username = normalized.webdav.username ?? "";
     config.webdav.password = normalized.webdav.password ?? "";
     config.webdav.remoteDir = normalized.webdav.remoteDir ?? "my-sync";
-    config.webdav.clientId = normalized.webdav.clientId ?? "";
+    config.webdav.spaceId = normalized.webdav.spaceId ?? "default";
+    config.webdav.deviceId = normalized.webdav.deviceId ?? "";
+    config.webdav.deviceName = normalized.webdav.deviceName ?? "";
     config.webdav.syncIntervalSecs = normalized.webdav.syncIntervalSecs ?? 30;
     config.webdav.autoSync = true;
     config.sync.defaultConflictStrategy = normalized.sync.defaultConflictStrategy ?? "manual";
     config.sync.fsWatchEnabled = normalized.sync.fsWatchEnabled ?? true;
     config.sync.debounceDelaySecs = normalized.sync.debounceDelaySecs ?? 15;
     config.sync.launchOnBoot = normalized.sync.launchOnBoot ?? false;
-    config.mappings.splice(0, config.mappings.length, ...normalized.mappings);
+    config.mappings.splice(
+      0,
+      config.mappings.length,
+      ...normalized.mappings.map((item) => ({
+        ...item,
+        bindingStatus: item.bindingStatus || (item.localPath?.trim() ? "bound" : "pending_bind"),
+      })),
+    );
   }
 
   async function validateLocalFilePath(localPath: string) {
@@ -274,6 +288,17 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     }
   }
 
+  function clearBinding(id: string) {
+    const target = config.mappings.find((item) => item.id === id);
+    if (!target) {
+      return;
+    }
+
+    target.localPath = "";
+    target.bindingStatus = "pending_bind";
+    schedulePersistConfig();
+  }
+
   async function chooseFile(mapping: FileMapping) {
     const selected = await open({
       multiple: false,
@@ -301,6 +326,10 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     if (!mapping.remotePath.trim()) {
       mapping.remotePath = inferRemotePathFromLocal(selected);
     }
+    if (!mapping.pathTemplate.trim()) {
+      mapping.pathTemplate = inferPathTemplateFromLocal(selected);
+    }
+    mapping.bindingStatus = "bound";
     schedulePersistConfig();
   }
 
@@ -342,6 +371,8 @@ export const useSyncAppStore = defineStore("sync-app", () => {
       name: entry.name,
       localPath: selected,
       remotePath: entry.path,
+      pathTemplate: inferPathTemplateFromLocal(selected),
+      bindingStatus: "bound",
     });
     schedulePersistConfig();
     notify("positive", "已从远端文件创建映射");
@@ -483,6 +514,7 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     loadRemoteFiles,
     mapRemoteEntryToLocal,
     renameMapping,
+    clearBinding,
     removeMapping,
     selectTab,
     statusTone,

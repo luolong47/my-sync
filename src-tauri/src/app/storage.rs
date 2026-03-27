@@ -1,10 +1,20 @@
 fn normalize_config(mut config: AppConfig) -> AppConfig {
     config.webdav.base_url = config.webdav.base_url.trim().to_string();
     config.webdav.username = config.webdav.username.trim().to_string();
-    config.webdav.client_id = if config.webdav.client_id.trim().is_empty() {
-        generate_client_id()
+    config.webdav.space_id = if config.webdav.space_id.trim().is_empty() {
+        default_space_id()
     } else {
-        config.webdav.client_id.trim().to_string()
+        config.webdav.space_id.trim().replace('\\', "/")
+    };
+    config.webdav.device_id = if config.webdav.device_id.trim().is_empty() {
+        generate_device_id()
+    } else {
+        config.webdav.device_id.trim().to_string()
+    };
+    config.webdav.device_name = if config.webdav.device_name.trim().is_empty() {
+        generate_device_name()
+    } else {
+        config.webdav.device_name.trim().to_string()
     };
     config.webdav.remote_dir = if config.webdav.remote_dir.trim().is_empty() {
         DEFAULT_REMOTE_DIR.into()
@@ -26,6 +36,12 @@ fn normalize_config(mut config: AppConfig) -> AppConfig {
             item.name = item.name.trim().to_string();
             item.local_path = item.local_path.trim().to_string();
             item.remote_path = item.remote_path.trim().replace('\\', "/");
+            item.path_template = if item.path_template.trim().is_empty() {
+                infer_path_template(&item.local_path)
+            } else {
+                item.path_template.trim().replace('\\', "/")
+            };
+            item.binding_status = normalize_binding_status(&item.binding_status, &item.local_path);
             item
         })
         .collect();
@@ -44,7 +60,7 @@ fn can_prepare_remote_root(config: &AppConfig) -> bool {
     !config.webdav.base_url.is_empty()
         && !config.webdav.username.is_empty()
         && !config.webdav.remote_dir.is_empty()
-        && !config.webdav.client_id.is_empty()
+        && !config.webdav.space_id.is_empty()
 }
 
 fn evaluate_readiness(
@@ -61,17 +77,16 @@ fn evaluate_readiness(
         return (false, "还没有配置文件映射".into());
     }
 
+    let mut bound_count = 0usize;
     for mapping in &config.mappings {
-        if mapping.local_path.trim().is_empty() {
-            return (false, format!("{} 缺少本地路径", mapping.name));
-        }
         if mapping.remote_path.trim().is_empty() {
             return (false, format!("{} 缺少远端路径", mapping.name));
         }
-        let path = Path::new(&mapping.local_path);
-        if !path.exists() {
-            return (false, format!("{} 的本地文件不存在", mapping.name));
+        if mapping.binding_status != "bound" || mapping.local_path.trim().is_empty() {
+            continue;
         }
+        bound_count += 1;
+        let path = Path::new(&mapping.local_path);
         if let Ok(meta) = fs::metadata(path) {
             if meta.len() > MAX_SYNC_FILE_BYTES {
                 return (false, format!("{} 超过 1MB 限制", mapping.name));
@@ -79,12 +94,16 @@ fn evaluate_readiness(
         }
     }
 
+    if bound_count == 0 {
+        return (false, "还没有完成当前设备的本地路径绑定".into());
+    }
+
     let conflicts = file_states.values().filter(|item| item.status == "conflict").count();
     if conflicts > 0 {
         return (false, format!("有 {} 个冲突待处理", conflicts));
     }
 
-    (true, "配置完整，本地文件有效，可开始同步".into())
+    (true, format!("已绑定 {} 个同步项，可开始同步", bound_count))
 }
 
 fn default_runtime_state() -> FileRuntimeState {
@@ -240,10 +259,10 @@ fn normalize_segments(input: &str) -> Vec<String> {
         .collect()
 }
 
-fn join_remote_segments_with_client(base: &str, client_id: &str, extra: &str) -> Vec<String> {
+fn join_remote_segments_with_space(base: &str, space_id: &str, extra: &str) -> Vec<String> {
     let mut segments = normalize_segments(base);
-    if !client_id.trim().is_empty() {
-        segments.push(client_id.trim().to_string());
+    if !space_id.trim().is_empty() {
+        segments.push(space_id.trim().to_string());
     }
     segments.extend(normalize_segments(extra));
     segments
@@ -270,8 +289,296 @@ fn now_string() -> String {
     Utc::now().to_rfc3339()
 }
 
-fn generate_client_id() -> String {
-    format!("client-{}", Utc::now().format("%Y%m%d%H%M%S"))
+fn infer_path_template(local_path: &str) -> String {
+    let normalized = local_path.trim().replace('\\', "/");
+    if normalized.is_empty() {
+        return String::new();
+    }
+
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let normalized_profile = user_profile.trim().replace('\\', "/");
+        if !normalized_profile.is_empty() && normalized.starts_with(&normalized_profile) {
+            let suffix = normalized
+                .trim_start_matches(&normalized_profile)
+                .trim_start_matches('/');
+            return if suffix.is_empty() {
+                "%USERPROFILE%".into()
+            } else {
+                format!("%USERPROFILE%/{suffix}")
+            };
+        }
+    }
+
+    if let Ok(home) = std::env::var("HOME") {
+        let normalized_home = home.trim().replace('\\', "/");
+        if !normalized_home.is_empty() && normalized.starts_with(&normalized_home) {
+            let suffix = normalized
+                .trim_start_matches(&normalized_home)
+                .trim_start_matches('/');
+            return if suffix.is_empty() {
+                "$HOME".into()
+            } else {
+                format!("$HOME/{suffix}")
+            };
+        }
+    }
+
+    normalized
+}
+
+fn resolve_local_path_from_template(path_template: &str) -> Option<String> {
+    let template = path_template.trim().replace('\\', "/");
+    if template.is_empty() {
+        return None;
+    }
+
+    let replacements = [
+        ("%USERPROFILE%", std::env::var("USERPROFILE").ok()),
+        ("%APPDATA%", std::env::var("APPDATA").ok()),
+        ("$HOME", std::env::var("HOME").ok()),
+    ];
+
+    let mut resolved = template.clone();
+    for (token, value) in replacements {
+        if let Some(actual) = value {
+            resolved = resolved.replace(token, &actual.replace('\\', "/"));
+        }
+    }
+
+    Some(resolved.replace('/', "\\"))
+}
+
+fn build_shared_sync_items(config: &AppConfig) -> Vec<SharedSyncItem> {
+    config
+        .mappings
+        .iter()
+        .map(|mapping| SharedSyncItem {
+            id: mapping.id.clone(),
+            name: mapping.name.clone(),
+            remote_path: mapping.remote_path.clone(),
+            path_template: if mapping.path_template.trim().is_empty() {
+                infer_path_template(&mapping.local_path)
+            } else {
+                mapping.path_template.clone()
+            },
+        })
+        .filter(|item| !item.id.trim().is_empty() && !item.remote_path.trim().is_empty())
+        .collect()
+}
+
+fn build_device_bindings(config: &AppConfig) -> Vec<DeviceBinding> {
+    config
+        .mappings
+        .iter()
+        .filter(|mapping| {
+            !mapping.id.trim().is_empty()
+                && mapping.binding_status == "bound"
+                && !mapping.local_path.trim().is_empty()
+        })
+        .map(|mapping| DeviceBinding {
+            sync_item_id: mapping.id.clone(),
+            local_path: mapping.local_path.clone(),
+            updated_at: Some(now_string()),
+        })
+        .collect()
+}
+
+fn merge_remote_state(
+    local: &AppConfig,
+    shared_items: &[SharedSyncItem],
+    device_bindings: &[DeviceBinding],
+) -> AppConfig {
+    let mut merged = local.clone();
+    let local_by_id = local
+        .mappings
+        .iter()
+        .cloned()
+        .map(|item| (item.id.clone(), item))
+        .collect::<HashMap<_, _>>();
+    let bindings_by_id = device_bindings
+        .iter()
+        .cloned()
+        .map(|item| (item.sync_item_id.clone(), item))
+        .collect::<HashMap<_, _>>();
+
+    let source_items = if shared_items.is_empty() {
+        build_shared_sync_items(local)
+    } else {
+        shared_items.to_vec()
+    };
+
+    let mappings = source_items
+        .iter()
+        .map(|item| {
+            let local_mapping = local_by_id.get(&item.id);
+            let remote_binding = bindings_by_id.get(&item.id);
+            let local_binding = local_mapping.filter(|value| value.binding_status == "bound");
+            let local_path = remote_binding
+                .map(|binding| binding.local_path.clone())
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| {
+                    local_binding
+                        .map(|value| value.local_path.clone())
+                        .filter(|value| !value.trim().is_empty())
+                });
+            let inferred_path = if local_path.is_none() {
+                resolve_local_path_from_template(&item.path_template)
+            } else {
+                None
+            };
+            let final_local_path = local_path.or(inferred_path).unwrap_or_default();
+            let binding_status = if remote_binding.is_some() || local_binding.is_some() {
+                "bound"
+            } else {
+                "pending_bind"
+            };
+
+            FileMapping {
+                id: item.id.clone(),
+                name: if item.name.trim().is_empty() {
+                    local_mapping
+                        .map(|value| value.name.clone())
+                        .unwrap_or_default()
+                } else {
+                    item.name.clone()
+                },
+                local_path: final_local_path,
+                remote_path: item.remote_path.clone(),
+                path_template: item.path_template.clone(),
+                binding_status: binding_status.into(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    merged.mappings = mappings;
+    merged
+}
+
+fn sync_remote_state(
+    local: &AppConfig,
+    remote_items: Option<Vec<SharedSyncItem>>,
+    remote_bindings: Option<Vec<DeviceBinding>>,
+) -> (AppConfig, Vec<SharedSyncItem>, Vec<DeviceBinding>) {
+    let shared_items = match remote_items {
+        Some(items) => items,
+        None => build_shared_sync_items(local),
+    };
+
+    let bindings = match remote_bindings {
+        Some(items) => items,
+        None => build_device_bindings(local),
+    };
+
+    let filtered_bindings = bindings
+        .into_iter()
+        .filter(|binding| shared_items.iter().any(|item| item.id == binding.sync_item_id))
+        .collect::<Vec<_>>();
+
+    (
+        merge_remote_state(local, &shared_items, &filtered_bindings),
+        shared_items,
+        filtered_bindings,
+    )
+}
+
+fn normalize_binding_status(value: &str, local_path: &str) -> String {
+    match value.trim() {
+        "bound" if !local_path.trim().is_empty() => "bound".into(),
+        _ => "pending_bind".into(),
+    }
+}
+
+fn generate_device_name() -> String {
+    let host = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "unknown-device".into());
+    let user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_else(|_| "unknown-user".into());
+    format!("{host}/{user}")
+}
+
+fn generate_device_id() -> String {
+    let candidates = collect_hardware_fingerprint_parts();
+    if candidates.is_empty() {
+        return format!("device-{}", Utc::now().format("%Y%m%d%H%M%S"));
+    }
+
+    let joined = candidates.join("|");
+    let mut hasher = Sha256::new();
+    hasher.update(joined.as_bytes());
+    let digest = format!("{:x}", hasher.finalize());
+    format!("device-{}", &digest[..24])
+}
+
+fn collect_hardware_fingerprint_parts() -> Vec<String> {
+    let commands = [
+        (
+            "machine_uuid",
+            "(Get-CimInstance Win32_ComputerSystemProduct).UUID",
+        ),
+        (
+            "baseboard_serial",
+            "(Get-CimInstance Win32_BaseBoard).SerialNumber",
+        ),
+        ("bios_serial", "(Get-CimInstance Win32_BIOS).SerialNumber"),
+        ("cpu_id", "(Get-CimInstance Win32_Processor | Select-Object -First 1).ProcessorId"),
+        (
+            "system_disk_serial",
+            "(Get-CimInstance Win32_PhysicalMedia | Select-Object -First 1).SerialNumber",
+        ),
+    ];
+
+    commands
+        .iter()
+        .filter_map(|(key, command)| {
+            run_powershell_value(command)
+                .and_then(|value| normalize_hardware_value(&value))
+                .map(|value| format!("{key}={value}"))
+        })
+        .collect()
+}
+
+fn run_powershell_value(command: &str) -> Option<String> {
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", command])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+fn normalize_hardware_value(value: &str) -> Option<String> {
+    let normalized = value
+        .trim()
+        .chars()
+        .filter(|ch| !matches!(ch, '-' | ' ' | '\r' | '\n' | '\t'))
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let invalid_values = [
+        "unknown",
+        "tobefilledbyo.e.m.",
+        "tobefilledbyoem",
+        "systemserialnumber",
+        "defaultstring",
+        "none",
+        "null",
+        "ffffffffffffffff",
+        "0000000000000000",
+        "00000000",
+    ];
+
+    if invalid_values.contains(&normalized.as_str()) || normalized.chars().all(|ch| ch == '0') {
+        return None;
+    }
+
+    Some(normalized)
 }
 
 struct LogEntryArgs<'a> {
@@ -329,7 +636,6 @@ fn is_watched_path(config: &AppConfig, path: &Path) -> bool {
         let target = PathBuf::from(mapping.local_path.trim())
             .to_string_lossy()
             .replace('\\', "/");
-        normalized == target || normalized.starts_with(&format!("{target}."))
+        !target.is_empty() && (normalized == target || normalized.starts_with(&format!("{target}.")))
     })
 }
-

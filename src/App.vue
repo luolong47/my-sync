@@ -146,6 +146,7 @@ onBeforeUnmount(() => {
           @browse="store.loadRemoteFiles"
           @choose-file="store.chooseFile"
           @clear-logs="store.clearLogs"
+          @clear-binding="store.clearBinding"
           @config-updated="store.handleConfigUpdated"
           @create-directory="store.createRemoteDirectory"
           @delete-entry="store.deleteRemoteEntry"

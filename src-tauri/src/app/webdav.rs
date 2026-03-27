@@ -65,9 +65,55 @@ impl WebDavClient {
         Ok(status)
     }
 
+    async fn fetch_shared_sync_items(&self) -> Result<Option<Vec<SharedSyncItem>>, String> {
+        let remote = self.fetch_file(".config/sync-items.json").await?;
+        let Some(bytes) = remote.bytes else {
+            return Ok(None);
+        };
+        let parsed: SharedConfigFile = serde_json::from_slice(&bytes).map_err(|err| err.to_string())?;
+        Ok(Some(parsed.items))
+    }
+
+    async fn save_shared_sync_items(&self, items: &[SharedSyncItem]) -> Result<(), String> {
+        let payload = SharedConfigFile {
+            items: items.to_vec(),
+            updated_at: Some(now_string()),
+        };
+        let bytes = serde_json::to_vec_pretty(&payload).map_err(|err| err.to_string())?;
+        self.upload_file(".config/sync-items.json", bytes).await?;
+        Ok(())
+    }
+
+    async fn fetch_device_bindings(&self) -> Result<Option<Vec<DeviceBinding>>, String> {
+        let remote = self
+            .fetch_file(&format!(".devices/{}/bindings.json", self.settings.device_id.trim()))
+            .await?;
+        let Some(bytes) = remote.bytes else {
+            return Ok(None);
+        };
+        let parsed: DeviceBindingsFile =
+            serde_json::from_slice(&bytes).map_err(|err| err.to_string())?;
+        Ok(Some(parsed.bindings))
+    }
+
+    async fn save_device_bindings(&self, bindings: &[DeviceBinding]) -> Result<(), String> {
+        let payload = DeviceBindingsFile {
+            device_id: self.settings.device_id.clone(),
+            device_name: self.settings.device_name.clone(),
+            bindings: bindings.to_vec(),
+            updated_at: Some(now_string()),
+        };
+        let bytes = serde_json::to_vec_pretty(&payload).map_err(|err| err.to_string())?;
+        self.upload_file(
+            &format!(".devices/{}/bindings.json", self.settings.device_id.trim()),
+            bytes,
+        )
+        .await?;
+        Ok(())
+    }
+
     async fn ensure_root_collection(&self) -> Result<(), String> {
-        self.ensure_collection_chain(&self.remote_root_segments())
-            .await
+        self.ensure_collection_chain(&self.remote_root_segments()).await
     }
 
     async fn create_remote_directory(&self, remote_dir_path: &str) -> Result<(), String> {
@@ -84,15 +130,14 @@ impl WebDavClient {
             all_segments.extend(file_segments[..file_segments.len() - 1].iter().cloned());
         }
 
-        self.ensure_collection_chain(&all_segments)
-            .await
+        self.ensure_collection_chain(&all_segments).await
     }
 
     async fn list_remote_entries(&self, remote_path: &str) -> Result<Vec<RemoteBrowserEntry>, String> {
         let propfind = Method::from_bytes(b"PROPFIND").map_err(|err| err.to_string())?;
-        let url = self.collection_url(&join_remote_segments_with_client(
+        let url = self.collection_url(&join_remote_segments_with_space(
             &self.settings.remote_dir,
-            &self.settings.client_id,
+            &self.settings.space_id,
             remote_path,
         ))?;
         let response = self
@@ -128,6 +173,11 @@ impl WebDavClient {
                 continue;
             }
 
+            let relative_name = relative.trim_end_matches('/').to_string();
+            if matches!(relative_name.as_str(), ".config" | ".devices") {
+                continue;
+            }
+
             let prop = item.propstats.into_iter().next().map(|value| value.prop);
             let display_name = prop
                 .as_ref()
@@ -153,13 +203,9 @@ impl WebDavClient {
             entries.push(RemoteBrowserEntry {
                 name: display_name,
                 path: if remote_path.trim().is_empty() {
-                    relative.trim_end_matches('/').to_string()
+                    relative_name
                 } else {
-                    format!(
-                        "{}/{}",
-                        remote_path.trim_matches('/'),
-                        relative.trim_end_matches('/')
-                    )
+                    format!("{}/{}", remote_path.trim_matches('/'), relative_name)
                 },
                 is_dir,
                 size,
@@ -246,9 +292,9 @@ impl WebDavClient {
     }
 
     fn file_url(&self, remote_path: &str) -> Result<Url, String> {
-        self.build_url_with_segments(&join_remote_segments_with_client(
+        self.build_url_with_segments(&join_remote_segments_with_space(
             &self.settings.remote_dir,
-            &self.settings.client_id,
+            &self.settings.space_id,
             remote_path,
         ))
     }
@@ -279,10 +325,9 @@ impl WebDavClient {
 
     fn remote_root_segments(&self) -> Vec<String> {
         let mut segments = normalize_segments(&self.settings.remote_dir);
-        if !self.settings.client_id.trim().is_empty() {
-            segments.push(self.settings.client_id.trim().to_string());
+        if !self.settings.space_id.trim().is_empty() {
+            segments.push(self.settings.space_id.trim().to_string());
         }
         segments
     }
 }
-

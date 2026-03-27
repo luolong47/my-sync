@@ -25,6 +25,10 @@ struct FileMapping {
     name: String,
     local_path: String,
     remote_path: String,
+    #[serde(default)]
+    path_template: String,
+    #[serde(default)]
+    binding_status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +38,12 @@ struct WebDavSettings {
     username: String,
     password: String,
     remote_dir: String,
-    client_id: String,
+    #[serde(default = "default_space_id", alias = "spaceId")]
+    space_id: String,
+    #[serde(default, alias = "clientId")]
+    device_id: String,
+    #[serde(default)]
+    device_name: String,
     sync_interval_secs: u64,
     auto_sync: bool,
 }
@@ -46,7 +55,9 @@ impl Default for WebDavSettings {
             username: String::new(),
             password: String::new(),
             remote_dir: DEFAULT_REMOTE_DIR.into(),
-            client_id: String::new(),
+            space_id: default_space_id(),
+            device_id: String::new(),
+            device_name: String::new(),
             sync_interval_secs: 30,
             auto_sync: true,
         }
@@ -148,6 +159,39 @@ struct AppSnapshot {
     runtime: RuntimeSnapshot,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+struct SharedSyncItem {
+    id: String,
+    name: String,
+    remote_path: String,
+    path_template: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct SharedConfigFile {
+    items: Vec<SharedSyncItem>,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+struct DeviceBinding {
+    sync_item_id: String,
+    local_path: String,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+struct DeviceBindingsFile {
+    device_id: String,
+    device_name: String,
+    bindings: Vec<DeviceBinding>,
+    updated_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RemoteBrowserEntry {
@@ -246,4 +290,8 @@ enum ConflictStrategy {
     Manual,
     Local,
     Remote,
+}
+
+fn default_space_id() -> String {
+    "default".into()
 }
