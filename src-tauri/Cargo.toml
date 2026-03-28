@@ -1,6 +1,6 @@
 [package]
 name = "my-sync"
-version = "0.1.14"
+version = "0.1.16"
 description = "Sparse config sync over WebDAV"
 authors = ["LuoLong"]
 edition = "2021"
