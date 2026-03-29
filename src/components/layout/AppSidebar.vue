@@ -4,6 +4,7 @@ import type { NavItem, RuntimeSnapshot, TabKey } from "../../types/app";
 defineProps<{
   currentTab: TabKey;
   isDarkMode: boolean;
+  isMini: boolean;
   modelValue: boolean;
   navItems: NavItem[];
   runtime: RuntimeSnapshot;
@@ -20,32 +21,13 @@ defineEmits<{
   <q-drawer
     :model-value="modelValue"
     show-if-above
-    :breakpoint="820"
+    :mini="isMini"
+    :breakpoint="500"
     :width="188"
     class="sidebar"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <div class="sidebar-brand">
-      <q-icon name="sym_r_sync" size="30px" color="primary" />
-      <div>
-        <div class="brand-title">
-          My Sync
-        </div>
-        <div class="brand-subtitle">
-          Sparse Config Sync
-        </div>
-      </div>
-      <q-space />
-      <q-btn
-        flat
-        round
-        color="primary"
-        :icon="isDarkMode ? 'sym_r_light_mode' : 'sym_r_dark_mode'"
-        @click="$emit('toggleTheme')"
-      />
-    </div>
-
-    <q-list padding>
+    <q-list padding class="q-mt-sm">
       <q-item
         v-for="item in navItems"
         :key="item.key"
@@ -64,10 +46,19 @@ defineEmits<{
 
     <div class="sidebar-footer">
       <div class="sync-status" :class="runtime.isReady ? 'ready' : 'pending'">
-        <div class="status-dot" />
-        <div>
+        <div class="status-dot tooltip-target">
+          <q-tooltip
+            v-if="isMini"
+            anchor="center right"
+            self="center left"
+            :offset="[10, 0]"
+          >
+            {{ runtime.isReady ? "系统就绪" : "待处理" }}
+          </q-tooltip>
+        </div>
+        <div v-show="!isMini">
           <strong>{{ runtime.isSyncing ? "同步中" : runtime.isReady ? "系统就绪" : "待处理" }}</strong>
-          <div>{{ runtime.readinessDetail }}</div>
+          <div>{{ runtime.isSyncing ? "正在与远端保持同步..." : (runtime.lastSummary || runtime.readinessDetail) }}</div>
         </div>
       </div>
     </div>

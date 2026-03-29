@@ -9,33 +9,36 @@ defineProps<{
   runtime: RuntimeSnapshot;
   runtimeStatus: (id: string) => MappingRuntime;
   statusTone: (status: string) => string;
+  isDarkMode: boolean;
 }>();
 
 defineEmits<{
   navigate: [tab: TabKey];
   syncNow: [];
+  toggleTheme: [];
 }>();
 </script>
 
 <template>
   <div class="view-shell">
     <div class="view-header dashboard-header">
-      <div class="dashboard-title-block">
+      <div class="row items-center q-gutter-x-sm">
+        <q-btn
+          class="dashboard-sync-btn"
+          color="primary"
+          unelevated
+          round
+          icon="sym_r_sync"
+          :disable="!canSync || runtime.isSyncing"
+          :loading="runtime.isSyncing"
+          @click="$emit('syncNow')"
+        >
+          <q-tooltip>立即同步</q-tooltip>
+        </q-btn>
         <div class="eyebrow">
-          Dashboard
+          仪表盘概览
         </div>
-        <h1>仪表盘</h1>
       </div>
-      <q-btn
-        class="dashboard-sync-btn"
-        color="primary"
-        unelevated
-        icon="sym_r_sync"
-        label="立即同步"
-        :disable="!canSync || runtime.isSyncing"
-        :loading="runtime.isSyncing"
-        @click="$emit('syncNow')"
-      />
     </div>
 
     <div class="stats-grid">
@@ -112,16 +115,18 @@ defineEmits<{
         <div class="dashboard-panel-body">
           <q-list v-if="mappings.length > 0" separator class="dashboard-list">
             <q-item v-for="item in mappings" :key="item.id">
+              <q-item-section avatar style="min-width: 28px">
+                <div class="status-dot" :class="`status-dot--${statusTone(runtimeStatus(item.id).status)}`">
+                  <q-tooltip anchor="center right" self="center left" :offset="[10, 0]">
+                    {{ runtimeStatus(item.id).status }}
+                  </q-tooltip>
+                </div>
+              </q-item-section>
               <q-item-section>
                 <q-item-label>{{ item.name || item.remotePath || item.localPath }}</q-item-label>
                 <q-item-label caption>
                   {{ runtimeStatus(item.id).detail }}
                 </q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-chip dense class="status-pill" :class="`status-pill--${statusTone(runtimeStatus(item.id).status)}`">
-                  {{ runtimeStatus(item.id).status }}
-                </q-chip>
               </q-item-section>
             </q-item>
           </q-list>

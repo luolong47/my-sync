@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { ref, computed, onBeforeUnmount, onMounted } from "vue";
 import { storeToRefs } from "pinia";
 import { useQuasar } from "quasar";
 import AppSidebar from "./components/layout/AppSidebar.vue";
@@ -53,52 +53,66 @@ const currentView = computed(() => {
 });
 
 const currentViewProps = computed(() => {
+  const baseProps = {
+    isDarkMode: isDarkMode.value,
+    runtimeStatus: store.runtimeStatus,
+    statusTone: store.statusTone,
+  };
+  
   switch (currentTab.value) {
     case "dashboard":
       return {
+        ...baseProps,
         canSync: canSync.value,
         formatDateTime: store.formatDateTime,
         mappings: config.value.mappings,
         recentLogs: recentLogs.value,
         runtime: runtime.value,
-        runtimeStatus: store.runtimeStatus,
-        statusTone: store.statusTone,
       };
     case "files":
       return {
+        ...baseProps,
         config: config.value,
         isLoadingRemote: isLoadingRemote.value,
         mappings: config.value.mappings,
         remoteEntries: remoteEntries.value,
         remotePath: remotePath.value,
         remotePathLabel: remotePathLabel.value,
-        runtimeStatus: store.runtimeStatus,
-        statusTone: store.statusTone,
       };
     case "logs":
       return {
+        ...baseProps,
         formatDateTime: store.formatDateTime,
         logs: logs.value,
       };
     case "conflicts":
       return {
+        ...baseProps,
         conflictItems: conflictItems.value,
-        runtimeStatus: store.runtimeStatus,
       };
     case "settings":
       return {
+        ...baseProps,
         config: config.value,
         fullRemotePath: store.fullRemotePath,
         isAutoSaving: isAutoSaving.value,
         isMappingDropActive: isMappingDropActive.value,
         remoteRootPath: remoteRootPath.value,
-        runtimeStatus: store.runtimeStatus,
-        statusTone: store.statusTone,
       };
     default:
-      return {};
+      return baseProps;
   }
 });
+
+const isSidebarMini = ref(false);
+
+function handleToggleDrawer() {
+  if ($q.screen.lt.sm) {
+    store.toggleDrawer();
+  } else {
+    isSidebarMini.value = !isSidebarMini.value;
+  }
+}
 
 function handleSelectTab(tab: typeof currentTab.value) {
   store.selectTab(tab, $q.screen.lt.md);
@@ -118,11 +132,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <q-layout view="lHh Lpr lFf">
+  <q-layout view="hHh Lpr lFf">
     <MobileHeader
-      v-if="$q.screen.lt.md"
       :is-dark-mode="isDarkMode"
-      @toggle-drawer="store.toggleDrawer"
+      @toggle-drawer="handleToggleDrawer"
       @toggle-theme="handleToggleTheme"
     />
 
@@ -130,6 +143,7 @@ onBeforeUnmount(() => {
       v-model="leftDrawerOpen"
       :current-tab="currentTab"
       :is-dark-mode="isDarkMode"
+      :is-mini="isSidebarMini"
       :nav-items="navItems"
       :runtime="runtime"
       @select-tab="handleSelectTab"
@@ -159,6 +173,7 @@ onBeforeUnmount(() => {
           @rename-entry="store.renameRemoteEntry"
           @resolve="store.resolveConflict"
           @sync-now="store.syncNow"
+          @toggle-theme="handleToggleTheme"
           @upload-file="store.uploadLocalFile"
         />
 

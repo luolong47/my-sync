@@ -3,9 +3,8 @@
     <div class="view-header">
       <div>
         <div class="eyebrow">
-          About
+          关于
         </div>
-        <h1>关于</h1>
       </div>
     </div>
     <q-card flat class="panel-card about-card theme-surface">

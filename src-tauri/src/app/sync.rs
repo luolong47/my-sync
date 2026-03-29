@@ -42,9 +42,11 @@ async fn perform_sync(
     app: AppHandle,
     shared: Arc<Mutex<InMemoryState>>,
 ) -> Result<RuntimeSnapshot, String> {
+    info!("开始执行同步任务...");
     let (config, file_states) = {
         let mut guard = shared.lock().await;
         if guard.is_syncing {
+            info!("同步任务已在运行中，跳过本次触发");
             return Ok(runtime_snapshot(&guard));
         }
         guard.is_syncing = true;
@@ -59,6 +61,7 @@ async fn perform_sync(
 
     match outcome {
         Ok(result) => {
+            info!("同步任务完成：{}", result.summary);
             guard.file_states = result.file_states;
             guard.last_summary = result.summary;
             append_logs(&mut guard.sync_logs, result.logs);
@@ -66,6 +69,7 @@ async fn perform_sync(
             Ok(runtime_snapshot(&guard))
         }
         Err(err) => {
+            error!("同步任务失败：{}", err);
             guard.last_summary = format!("同步失败：{err}");
             append_logs(
                 &mut guard.sync_logs,

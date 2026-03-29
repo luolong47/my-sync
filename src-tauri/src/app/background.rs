@@ -168,7 +168,22 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("app".into()),
+                    }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .max_file_size(5 * 1024 * 1024) // 5MB
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .setup(|app| {
+            info!("应用启动中...");
             build_tray(app.handle())?;
             let mut persisted = load_persisted_state(app.handle())?;
             sync_launch_on_boot_from_system(app.handle(), &mut persisted.config);
@@ -179,9 +194,11 @@ pub fn run() {
             let watch_handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
+                info!("执行启动首次同步...");
                 sync_once_on_startup(app_handle, state).await;
             });
             std::thread::spawn(move || {
+                info!("启动文件监听线程...");
                 file_watch_loop(watch_handle, watch_state);
             });
 

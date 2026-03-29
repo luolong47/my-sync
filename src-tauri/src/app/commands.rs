@@ -327,30 +327,70 @@ async fn save_app_config(
     app: AppHandle,
     state: State<'_, SharedState>,
     config: AppConfig,
-) -> Result<RuntimeSnapshot, String> {
-    let normalized = normalize_config(config);
+) -> Result<AppSnapshot, String> {
+    let mut normalized = normalize_config(config);
+    let previous_webdav = {
+        let guard = state.0.lock().await;
+        guard.config.webdav.clone()
+    };
+    let webdav_changed = previous_webdav.base_url != normalized.webdav.base_url
+        || previous_webdav.username != normalized.webdav.username
+        || previous_webdav.password != normalized.webdav.password
+        || previous_webdav.remote_dir != normalized.webdav.remote_dir
+        || previous_webdav.space_id != normalized.webdav.space_id;
+
+    let mut sync_error = None;
     if can_prepare_remote_root(&normalized) {
-        let client = WebDavClient::new(normalized.webdav.clone())?;
-        client.ensure_root_collection().await?;
-        client
-            .save_shared_sync_items(&build_shared_sync_items(&normalized))
-            .await?;
-        client
-            .save_device_bindings(&build_device_bindings(&normalized))
-            .await?;
+        if webdav_changed {
+            match sync_remote_config_and_bindings(normalized.clone()).await {
+                Ok(next_config) => {
+                    normalized = next_config;
+                }
+                Err(err) => {
+                    sync_error = Some(err);
+                }
+            }
+        } else {
+            let client = WebDavClient::new(normalized.webdav.clone())?;
+            client.ensure_root_collection().await?;
+            client
+                .save_shared_sync_items(&build_shared_sync_items(&normalized))
+                .await?;
+            client
+                .save_device_bindings(&build_device_bindings(&normalized))
+                .await?;
+        }
     }
     apply_launch_on_boot(&app, normalized.sync.launch_on_boot)?;
     let snapshot = {
         let mut guard = state.0.lock().await;
         let previous_config = guard.config.clone();
         let queued_paths = collect_new_mapping_paths(&previous_config, &normalized);
-        guard.config = normalized;
+        guard.config = normalized.clone();
         if !queued_paths.is_empty() {
             guard.pending_sync_paths.extend(queued_paths);
             guard.pending_sync_started_at = Some(Instant::now());
         }
+        if let Some(err) = sync_error {
+            append_logs(
+                &mut guard.sync_logs,
+                vec![log_entry(LogEntryArgs {
+                    mapping: None,
+                    level: "warning",
+                    action: "save-remote-config",
+                    summary: "远端配置读取失败，您可稍后尝试同步",
+                    detail: &err,
+                    http_status: None,
+                    local_path: None,
+                    target_path: None,
+                })],
+            );
+        }
         persist_state(&app, &guard)?;
-        runtime_snapshot(&guard)
+        AppSnapshot {
+            config: normalized,
+            runtime: runtime_snapshot(&guard),
+        }
     };
 
     Ok(snapshot)

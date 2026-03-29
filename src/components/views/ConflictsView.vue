@@ -16,9 +16,8 @@ defineEmits<{
     <div class="view-header">
       <div>
         <div class="eyebrow">
-          Conflicts
+          冲突处理
         </div>
-        <h1>冲突处理</h1>
       </div>
     </div>
 

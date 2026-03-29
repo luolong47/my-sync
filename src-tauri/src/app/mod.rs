@@ -7,6 +7,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use log::{error, info};
 use notify::{Config as NotifyConfig, RecommendedWatcher, RecursiveMode, Watcher};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use quick_xml::de::from_str as from_xml_str;

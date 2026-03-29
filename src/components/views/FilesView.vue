@@ -141,9 +141,8 @@ function handleRemoveMapping(mapping: FileMapping) {
     <div class="view-header">
       <div>
         <div class="eyebrow">
-          Files
+          远端文件
         </div>
-        <h1>远端文件</h1>
       </div>
       <div class="row q-gutter-sm page-actions">
         <q-btn
@@ -255,15 +254,16 @@ function handleRemoveMapping(mapping: FileMapping) {
             />
             <div class="drive-row__text">
               <div class="drive-row__title">
-                <span class="drive-row__title-text">{{ entry.name }}</span>
-                <q-chip
+                <div
                   v-if="entryMapping(entry)"
-                  dense
-                  class="drive-inline-chip"
-                  :class="`status-pill--${statusTone(runtimeStatus(entryMapping(entry)!.id).status)}`"
+                  class="status-dot q-mr-sm"
+                  :class="`status-dot--${statusTone(runtimeStatus(entryMapping(entry)!.id).status)}`"
                 >
-                  {{ runtimeStatus(entryMapping(entry)!.id).status }}
-                </q-chip>
+                  <q-tooltip anchor="center right" self="center left" :offset="[10, 0]">
+                    {{ runtimeStatus(entryMapping(entry)!.id).status }}
+                  </q-tooltip>
+                </div>
+                <span class="drive-row__title-text">{{ entry.name }}</span>
               </div>
               <div v-if="entryMapping(entry)" class="drive-row__meta">
                 {{ runtimeStatus(entryMapping(entry)!.id).detail }} · {{ entryMapping(entry)?.localPath }}

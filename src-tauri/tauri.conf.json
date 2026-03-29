@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "My Sync",
+        "title": "My Sync - 极简配置同步",
         "width": 960,
         "height": 720,
         "minWidth": 800,

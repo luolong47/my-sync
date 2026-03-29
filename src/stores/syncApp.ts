@@ -209,10 +209,12 @@ export const useSyncAppStore = defineStore("sync-app", () => {
 
     isAutoSaving.value = true;
     try {
-      runtime.value = await invoke<RuntimeSnapshot>("save_app_config", {
+      const snapshot = await invoke<AppSnapshot>("save_app_config", {
         config: nextConfig,
       });
-      lastSavedConfig = cloneConfig(nextConfig);
+      resetConfig(snapshot.config);
+      lastSavedConfig = cloneConfig(snapshot.config);
+      runtime.value = snapshot.runtime;
       if (canBrowseRemote.value) {
         await loadRemoteFiles(remotePath.value);
       }
@@ -299,14 +301,20 @@ export const useSyncAppStore = defineStore("sync-app", () => {
     schedulePersistConfig();
   }
 
-  async function chooseFile(mapping: FileMapping) {
+  async function chooseFile(mapping?: FileMapping) {
     const selected = await open({
       multiple: false,
       directory: false,
-      title: "选择要同步的配置文件",
+      title: mapping ? "修改本地落点" : "选择要新增同步的配置文件",
     });
 
     if (typeof selected !== "string") {
+      return;
+    }
+
+    // 如果没有传入 mapping，说明是“新增”场景，复用 addMappingsFromPaths 逻辑
+    if (!mapping) {
+      await addMappingsFromPaths([selected]);
       return;
     }
 
