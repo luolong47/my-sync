@@ -1,6 +1,6 @@
 const STORE_FILE_NAME: &str = "state.json";
 const DEFAULT_REMOTE_DIR: &str = "my-sync";
-const MAX_SYNC_FILE_BYTES: u64 = 1024 * 1024;
+const MAX_SYNC_FILE_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_LOG_ENTRIES: usize = 500;
 const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_ICON_ID: &str = "main-tray";
